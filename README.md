@@ -2,6 +2,13 @@
 
 We need to capture and keep extremely big  data of IPv4 NAT translation information from Cisco ASR.
 simplenat format can save up to 80% disk space without compression.
+```
+%time simplenat/nf2nat -r nfcapd.13g -o nat.13g 
+simplenat/nf2nat -r nfcapd.13g -o nat.13g  25,59s user 15,48s system 17% cpu 3:48,92 total
+% du -sh *.13g
+2,6G    nat.13g
+ 13G    nfcapd.13g
+```
 
 Format of nat-files really very simple.
 Fixed size records, 24 bytes each.
