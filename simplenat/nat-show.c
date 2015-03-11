@@ -34,6 +34,7 @@ static void usage(char *name) {
 	 "\t-D\tdestination IP port\n"
 	 "\t-N\ttranslated IP port\n"
 	 "\t-p\tIP protocol\n"
+	 "\t-e\tNEL event type: 1 CREATE, 2 DELETE\n"
 	 "\t-v \tDump each packet to stdout.\n"
 	 , name);
 } /* usage */
@@ -41,15 +42,16 @@ static int verbose = 0;
 char outbuff[sizeof(natdata)*1000];
   ipv4 sa,da,na;
   uint16_t sp,dp,np;
-  uint8_t proto;
-  static int saf,daf,naf,spf,dpf,npf,protof;
+  uint8_t proto,evt;
+  
+  static int saf,daf,naf,spf,dpf,npf,protof,evtf;
 void string2ip(ipv4 *ip,const char *s){
   int n;
   n = sscanf(s,"%hhu.%hhu.%hhu.%hhu",
-	     &(ip->o[0]),
-	     &(ip->o[1]),
+	     &(ip->o[3]),
 	     &(ip->o[2]),
-	     &(ip->o[3])
+	     &(ip->o[1]),
+	     &(ip->o[0])
 	     );
   if(n != 4){
     fprintf(stderr,"Bad ip format: %s\n",s);
@@ -89,7 +91,11 @@ void parse_file(const char* fname){
 	(spf  && sp != o.srcport) ||
 	(dpf  && dp != o.dstport) ||
 	(npf  && np != o.natport) ||
-	(protof && proto != o.proto))
+	(npf  && np != o.natport) ||
+	(evtf && evt!= o.type) ||
+	(protof && proto!= o.proto))
+	
+
        {
 	 if(verbose)
 	   printf("skiprecord\n");
@@ -104,9 +110,9 @@ void parse_file(const char* fname){
 	     "%hhu.%hhu.%hhu.%hhu\t"
 	     "%5hu\t%5hu\t%5hu\t%03hu\t%hhu\n",
 	     datestr, 
-	     o.srcaddr.o[0],o.srcaddr.o[1],o.srcaddr.o[2],o.srcaddr.o[3],
-	     o.nataddr.o[0],o.nataddr.o[1],o.nataddr.o[2],o.nataddr.o[3],
-	     o.dstaddr.o[0],o.dstaddr.o[1],o.dstaddr.o[2],o.dstaddr.o[3],
+	     o.srcaddr.o[3],o.srcaddr.o[2],o.srcaddr.o[1],o.srcaddr.o[0],
+	     o.nataddr.o[3],o.nataddr.o[2],o.nataddr.o[1],o.nataddr.o[0],
+	     o.dstaddr.o[3],o.dstaddr.o[2],o.dstaddr.o[1],o.dstaddr.o[0],
 	     o.srcport, o.natport, o.dstport, o.proto,o.type
 	     );   
 
@@ -117,7 +123,7 @@ void parse_file(const char* fname){
 int main(int argc,char ** argv){
   int c;
   int n;
-  while ((c = getopt(argc, argv, "vs:d:n:S:D:N:p:")) != EOF) {
+  while ((c = getopt(argc, argv, "vs:d:n:S:D:N:p:e:")) != EOF) {
     switch (c) {
     case 's':
       string2ip(&sa, optarg);
@@ -146,6 +152,10 @@ int main(int argc,char ** argv){
     case 'p':
       proto = atoi(optarg);
       protof=1;
+      break;
+    case 'e':
+      evt = atoi(optarg);
+      evtf=1;
       break;
     case 'v':
       verbose = 1;
