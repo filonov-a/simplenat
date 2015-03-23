@@ -14,11 +14,14 @@ NFLDFLAGS=-L$(NFDUMPBIN) -L/usr/local/lib -lz
 NFDUMPOBJS=$(NFDUMPBIN)/nffile.o $(NFDUMPBIN)/flist.o $(NFDUMPBIN)/util.o \
 	$(NFDUMPBIN)/minilzo.o 	$(NFDUMPBIN)/nfx.o $(NFDUMPBIN)/exporter.o
 
-TARGETS=nf2nat nat-show
+TARGETS=nf2nat nat-show nfstat
 all: $(TARGETS)
 
 nf2nat: nf2nat.c
 	$(CC) $(NFCFLAGS) -o nf2nat  nf2nat.c  $(NFDUMPOBJS)
+
+nfstat: nfstat.c
+	$(CC) $(NFCFLAGS) -o nfstat  nfstat.c  $(NFDUMPOBJS)
 
 nat-show: nat-show.c
 	$(CC) -o nat-show $(CFLAGS) nat-show.c
