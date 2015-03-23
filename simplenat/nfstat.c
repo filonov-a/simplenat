@@ -180,28 +180,16 @@ void showActivity(){
   uint64_t mask;
   for(i=0,iptr=(uint64_t**)activity;i<256;i++,iptr++){
     if( ! *iptr ) continue;
-    //printf("ia=%d,%p %p\n",i,activity[i],iptr);
-
     for(j=0,jptr=(uint64_t**)*iptr;j<256;j++,jptr++){
       if( ! *jptr) continue;
-      //printf("ija=%d,%d %p\n",i,j,jptr);
       for(k=0,kptr=(uint64_t**)*jptr;k<256;k++,kptr++){
-	//printf("ijk=%d.%d.%d %p -> %p\n",i,j,k,kptr,*kptr);
 	ptr = (uint64_t*)*kptr;
 	if(! ptr) continue;
 	for(l=0;l<4;l++){
-	  mask = 1;
-	  for(m=0;m<64;m++){
-	    //printf("ijklm=%d.%d.%d.%d.%d mask=%lx \n",i,j,k,l,m,mask);
+	  for(m=0,mask=1;m<64;m++,mask<<=1){
 	    if(mask & ptr[l]){
 	      printf("%d.%d.%d.%d\n",i,j,k,l*64+m);
-	    }
-	    mask <<= 1;
-	  }
-	}
-      }
-    }
-  }
+	    }}}}}}
 }
 static void process_data(const char* outfile) {
   master_record_t	master_record;
