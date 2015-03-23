@@ -111,7 +111,7 @@ static void usage(char *name);
 
 static void print_record(void *record);
 
-static void process_data(const char*);
+static void process_data();
 
 /* Functions */
 
@@ -127,8 +127,8 @@ static void usage(char *name) {
 	 "-r\t\tread input from file\n"
 	 "-M <expr>\tRead input from multiple directories.\n"
 	 "-R <expr>\tRead input from sequence of files.\n"
-	 "-o <file>\tWrite binary dump to file.\n"
-	 "-v \tDump each packet to stdout.\n"
+	 "-o <file>\tWrite activity info file (default stdout).\n"
+	 "-v \tverbose output.\n"
 	 , name);
 } /* usage */
 
@@ -140,10 +140,9 @@ static void print_record(void *record) {
   uint64_t* bitmask;
   uint64_t maskbit;
   int maskaddr;
-  if(1 != r->event)  return;
-
+  
   addr.w = htonl(r->v4.srcaddr);
- r->v4.srcaddr = htonl(r->v4.srcaddr);
+  r->v4.srcaddr = htonl(r->v4.srcaddr);
   //  # = htonl(r->v4.srcaddr);
   inet_ntop(AF_INET, &r->v4.srcaddr, as, sizeof(as));
   as[40-1] = 0;
@@ -173,11 +172,22 @@ static void print_record(void *record) {
 
 } // End of print_record
 
-void showActivity(){
+void showActivity(const char * outfile){
   int i,j,k,l,m;
   uint64_t ** iptr,**jptr,**kptr;
   uint64_t * ptr;
   uint64_t mask;
+  FILE *F=stdout;
+
+  // Get the first file handle
+  if(outfile){
+    F = fopen(outfile,"w");
+    if(F == NULL){
+      LogError("Cannot open output file %s in %s line %d: %s\n",outfile, __FILE__, __LINE__, strerror(errno) );
+      exit(EXIT_FAILURE);
+    }
+  }
+
   for(i=0,iptr=(uint64_t**)activity;i<256;i++,iptr++){
     if( ! *iptr ) continue;
     for(j=0,jptr=(uint64_t**)*iptr;j<256;j++,jptr++){
@@ -188,25 +198,18 @@ void showActivity(){
 	for(l=0;l<4;l++){
 	  for(m=0,mask=1;m<64;m++,mask<<=1){
 	    if(mask & ptr[l]){
-	      printf("%d.%d.%d.%d\n",i,j,k,l*64+m);
+	      fprintf( F,"%d.%d.%d.%d\n",i,j,k,l*64+m);
 	    }}}}}}
+  if(outfile){
+    fclose(F);
+  }
 }
-static void process_data(const char* outfile) {
+static void process_data() {
   master_record_t	master_record;
   common_record_t *flow_record;
   nffile_t		*nffile;
   int 		i, done, ret;
   char 		as[40];
-  FILE *F=NULL;
-
-  // Get the first file handle
-  if(outfile !=NULL){
-    F = fopen(outfile,"w");
-    if(F == NULL){
-      LogError("Cannot open output file %s in %s line %d: %s\n",outfile, __FILE__, __LINE__, strerror(errno) );
-      exit(EXIT_FAILURE);
-    }
-  }
   // Get the first file handle
   nffile = GetNextFile(NULL, 0, 0);
   if ( !nffile ) {
@@ -315,9 +318,6 @@ static void process_data(const char* outfile) {
   DisposeFile(nffile);
 
   PackExtensionMapList(extension_map_list);
-  if(F){
-    fclose(F);
-  }
 } // End of process_data
 
 
@@ -374,9 +374,9 @@ int main( int argc, char **argv ) {
   }
 
   SetupInputFileSequence(Mdirs, rfile, Rfile);
-  process_data(outfile);
+  process_data();
 
   FreeExtensionMaps(extension_map_list);
-  showActivity();
+  showActivity(outfile);
   return 0;
 }

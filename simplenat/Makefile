@@ -17,6 +17,9 @@ NFDUMPOBJS=$(NFDUMPBIN)/nffile.o $(NFDUMPBIN)/flist.o $(NFDUMPBIN)/util.o \
 TARGETS=nf2nat nat-show nfstat
 all: $(TARGETS)
 
+install:
+	install $(TARGETS) /usr/local/bin
+
 nf2nat: nf2nat.c
 	$(CC) $(NFCFLAGS) -o nf2nat  nf2nat.c  $(NFDUMPOBJS)
 
