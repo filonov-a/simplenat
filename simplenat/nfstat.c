@@ -139,7 +139,7 @@ static void print_record(void *record) {
   uint64_t** ptr;
   uint64_t* bitmask;
   uint64_t maskbit;
-  int maskaddr;
+  unsigned maskaddr;
   
   addr.w = htonl(r->v4.srcaddr);
   r->v4.srcaddr = htonl(r->v4.srcaddr);
@@ -153,19 +153,15 @@ static void print_record(void *record) {
   }
   ptr =(uint64_t**) ptr[addr.o[0]];
   if(!ptr[addr.o[1]]){
-    ptr[addr.o[1]] = (uint64_t*)calloc(256,sizeof(uint64_t*));
+    ptr[addr.o[1]] = (uint64_t*)calloc(4*256,sizeof(uint64_t));
   }
-  ptr = (uint64_t**)ptr[addr.o[1]];
-  if(!ptr[addr.o[2]]){
-    ptr[addr.o[2]] = calloc(4,sizeof(uint64_t));
-  }
-  bitmask = (uint64_t *)ptr[addr.o[2]];
+  bitmask = (uint64_t*)ptr[addr.o[1]];
   maskbit = (uint64_t)1<< ( 0x3f &  addr.o[3]);
-  maskaddr = addr.o[3] >> 6;
+  maskaddr =  (addr.o[3] >> 6)+ ((unsigned)addr.o[3]<<2);
   bitmask[maskaddr] |= maskbit;
   if(verbose){
-    printf ( "srcaddr = %16s  %hhu.%hhu.%hhu.%hhu bitmask=%d bitnum=%lx bitaddr=%d \n" ,
-	   as,addr.o[0],addr.o[1],addr.o[2],addr.o[3],( 0x3f &  addr.o[3])
+    printf ( "srcaddr = %16s  %hhu.%hhu.%hhu.%hhu bitnum=%lx bitaddr=%u \n" ,
+	   as,addr.o[0],addr.o[1],addr.o[2],addr.o[3]
 	   ,maskbit,maskaddr
 	  );
   }
@@ -174,7 +170,7 @@ static void print_record(void *record) {
 
 void showActivity(const char * outfile){
   int i,j,k,l,m;
-  uint64_t ** iptr,**jptr,**kptr;
+  uint64_t ** iptr,**jptr;
   uint64_t * ptr;
   uint64_t mask;
   FILE *F=stdout;
@@ -192,14 +188,12 @@ void showActivity(const char * outfile){
     if( ! *iptr ) continue;
     for(j=0,jptr=(uint64_t**)*iptr;j<256;j++,jptr++){
       if( ! *jptr) continue;
-      for(k=0,kptr=(uint64_t**)*jptr;k<256;k++,kptr++){
-	ptr = (uint64_t*)*kptr;
-	if(! ptr) continue;
-	for(l=0;l<4;l++){
+      for(k=0,ptr=(uint64_t*)*jptr;k<4*256;k++,ptr++){
 	  for(m=0,mask=1;m<64;m++,mask<<=1){
 	    if(mask & ptr[l]){
-	      fprintf( F,"%d.%d.%d.%d\n",i,j,k,l*64+m);
-	    }}}}}}
+	      fprintf( F,"%d.%d.%d.%d\n",i,j,(k>>2),(k&3)*64+m);
+	    }}}}
+  }
   if(outfile){
     fclose(F);
   }
