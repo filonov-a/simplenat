@@ -131,7 +131,7 @@ static void usage(char *name) {
 	 "-v \tverbose output.\n"
 	 , name);
 } /* usage */
-
+static unsigned memstat2,memstat3;
 static void print_record(void *record) {
   char 		as[40];
   master_record_t *r = (master_record_t *)record;
@@ -142,39 +142,40 @@ static void print_record(void *record) {
   unsigned maskaddr;
   
   addr.w = htonl(r->v4.srcaddr);
-  r->v4.srcaddr = htonl(r->v4.srcaddr);
+  //r->v4.srcaddr = htonl(r->v4.srcaddr);
   //  # = htonl(r->v4.srcaddr);
-  inet_ntop(AF_INET, &r->v4.srcaddr, as, sizeof(as));
-  as[40-1] = 0;
+  //inet_ntop(AF_INET, &addr.w, as, sizeof(as));
+  //as[40-1] = 0;
 
-  ptr=(uint64_t**)activity;
-  if(!ptr[addr.o[0]]){
-    ptr[addr.o[0]] = (uint64_t*)calloc(256,sizeof(uint64_t*));
+  if(!activity[addr.o[0]]){
+    activity[addr.o[0]] = (uint64_t**)calloc(256,sizeof(uint64_t*));
+    memstat2++;
   }
-  ptr =(uint64_t**) ptr[addr.o[0]];
+  ptr =(uint64_t**) activity[addr.o[0]];
   if(!ptr[addr.o[1]]){
     ptr[addr.o[1]] = (uint64_t*)calloc(4*256,sizeof(uint64_t));
+    memstat3++;
   }
   bitmask = (uint64_t*)ptr[addr.o[1]];
   maskbit = (uint64_t)1<< ( 0x3f &  addr.o[3]);
-  maskaddr =  (addr.o[3] >> 6)+ ((unsigned)addr.o[3]<<2);
-  bitmask[maskaddr] |= maskbit;
-  if(verbose){
-    printf ( "srcaddr = %16s  %hhu.%hhu.%hhu.%hhu bitnum=%lx bitaddr=%u \n" ,
-	   as,addr.o[0],addr.o[1],addr.o[2],addr.o[3]
-	   ,maskbit,maskaddr
+  maskaddr =  ((unsigned)addr.o[3] >> 6) | ((unsigned)addr.o[2]<<2);
+  if(verbose && !(bitmask[maskaddr] & maskbit)){
+    printf ( "in = %hhu.%hhu.%hhu.%hhu    \tmaskarray=%p bit=%lx addr=%u.%u \n" ,
+	   addr.o[0],addr.o[1],addr.o[2],addr.o[3]
+	     ,bitmask,maskbit,maskaddr, ( 0x3f &  addr.o[3])
 	  );
   }
+  bitmask[maskaddr] |= maskbit;
 
 } // End of print_record
 
 void showActivity(const char * outfile){
-  int i,j,k,l,m;
+  unsigned i,j,k,m;
   uint64_t ** iptr,**jptr;
   uint64_t * ptr;
   uint64_t mask;
   FILE *F=stdout;
-
+  unsigned count=0;
   // Get the first file handle
   if(outfile){
     F = fopen(outfile,"w");
@@ -183,20 +184,27 @@ void showActivity(const char * outfile){
       exit(EXIT_FAILURE);
     }
   }
-
-  for(i=0,iptr=(uint64_t**)activity;i<256;i++,iptr++){
-    if( ! *iptr ) continue;
-    for(j=0,jptr=(uint64_t**)*iptr;j<256;j++,jptr++){
-      if( ! *jptr) continue;
-      for(k=0,ptr=(uint64_t*)*jptr;k<4*256;k++,ptr++){
+  
+  for(i=0;i<256;i++){
+    if( ! activity[i] ) continue;
+    for(j=0,jptr=activity[i];j<256;j++){
+      if( ! jptr[j]) continue;
+      for(k=0,ptr=(uint64_t*)jptr[j];k<4*256;k++){
 	  for(m=0,mask=1;m<64;m++,mask<<=1){
-	    if(mask & ptr[l]){
+	    if(mask & ptr[k]){
 	      fprintf( F,"%d.%d.%d.%d\n",i,j,(k>>2),(k&3)*64+m);
+	      if(verbose){
+		printf ( "out= %d.%d.%d.%d    \tmaskarray=%p bit=%lx addr=%u.%u \n" 
+			 ,i,j,(k>>2),(k&3)*64+m
+			 ,ptr,mask,k,m);
+	      }
+	      count++;
 	    }}}}
   }
   if(outfile){
     fclose(F);
   }
+  fprintf (stderr,"Total: %u addrs (%u l2 allocation, %u l3 allocation\n",count,memstat2,memstat3);
 }
 static void process_data() {
   master_record_t	master_record;
