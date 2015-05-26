@@ -27,7 +27,7 @@ nfstat: nfstat.c
 	$(CC) $(NFCFLAGS) -o nfstat  nfstat.c  $(NFDUMPOBJS)
 
 nat-show: nat-show.c
-	$(CC) -o nat-show $(CFLAGS) nat-show.c
+	$(CC) -o nat-show $(CFLAGS) nat-show.c -larchive
 
 clean:
 	rm -f *.o $(TARGETS)

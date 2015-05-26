@@ -6,6 +6,9 @@
 #include <sys/types.h>
 #include <time.h>
 
+#include <archive.h>
+#include <archive_entry.h>
+
 typedef union  {
     uint32_t w;
     uint8_t  o[4];
@@ -64,61 +67,72 @@ void parse_file(const char* fname){
   char datestr[64];
   struct tm 	*ts;
   time_t when;
+  struct archive *a;
+  struct archive_entry *entry;
+  int r;
 
    if(verbose){
      fprintf(stderr,"Parse file %s\n",fname);
    }
-   F=fopen(fname,"r");
-   if(F == NULL){
-     fprintf(stderr, "Cannot open file '%s': %s\n",fname, strerror(errno));
-     exit(EXIT_FAILURE);
+  a = archive_read_new();
+  archive_read_support_filter_all(a);
+  archive_read_support_format_raw(a);
+  
+  r = archive_read_open_filename(a, fname,4096000); // Note 1
+  if (r != ARCHIVE_OK) {
+    fprintf(stderr,"error %d :%s\n",archive_errno(a),archive_error_string(a));
+    exit(1);
+  }
+  while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+   if(verbose){
+     printf("Read next entry \"%s\"\n",archive_entry_pathname(entry));
    }
-
-   setbuffer(F,outbuff,sizeof(outbuff)); //turn on bufferization
-   while(!feof(F)){
-     size = fread(&o,sizeof(o),1,F);
-     if(size < 1 ) break;
-       if(verbose){
-	 printf (" %08x %08x %08x %08x %04hx %04hx %04hx %hhx %hhx\n",
-		 o.time, o.srcaddr.w, o.nataddr.w, o.dstaddr.w,
-		 o.srcport, o.natport, o.dstport, o.proto,o.type
-		 );   
-       }
-
-     if((saf  && sa.w != o.srcaddr.w) ||
-	(daf  && da.w != o.dstaddr.w) ||
-	(naf  && na.w != o.nataddr.w) ||
-	(spf  && sp != o.srcport) ||
-	(dpf  && dp != o.dstport) ||
-	(npf  && np != o.natport) ||
-	(npf  && np != o.natport) ||
-	(evtf && evt!= o.type) ||
-	(protof && proto!= o.proto))
-	
-
-       {
-	 if(verbose)
-	   printf("skiprecord\n");
-	 continue;
-       }
-     when = o.time;
-     ts = localtime(&when);
-     strftime(datestr, 63, "%Y-%m-%d %H:%M:%S", ts);
-     printf ("%s\t"
-	     "%hhu.%hhu.%hhu.%hhu\t"
-	     "%hhu.%hhu.%hhu.%hhu\t"
-	     "%hhu.%hhu.%hhu.%hhu\t"
-	     "%5hu\t%5hu\t%5hu\t%03hu\t%hhu\n",
-	     datestr, 
-	     o.srcaddr.o[3],o.srcaddr.o[2],o.srcaddr.o[1],o.srcaddr.o[0],
-	     o.nataddr.o[3],o.nataddr.o[2],o.nataddr.o[1],o.nataddr.o[0],
-	     o.dstaddr.o[3],o.dstaddr.o[2],o.dstaddr.o[1],o.dstaddr.o[0],
-	     o.srcport, o.natport, o.dstport, o.proto,o.type
-	     );   
-
-     
-   }
-   fclose(F);
+    while((size = archive_read_data(a, &o, sizeof(o))) > 0){
+      //printf("Readed %lu bytes\n",size);
+      if(verbose){
+	printf (" %08x %08x %08x %08x %04hx %04hx %04hx %hhx %hhx\n",
+		o.time, o.srcaddr.w, o.nataddr.w, o.dstaddr.w,
+		o.srcport, o.natport, o.dstport, o.proto,o.type
+		);   
+      }
+      
+      if((saf  && sa.w != o.srcaddr.w) ||
+	 (daf  && da.w != o.dstaddr.w) ||
+	 (naf  && na.w != o.nataddr.w) ||
+	 (spf  && sp != o.srcport) ||
+	 (dpf  && dp != o.dstport) ||
+	 (npf  && np != o.natport) ||
+	 (npf  && np != o.natport) ||
+	 (evtf && evt!= o.type) ||
+	 (protof && proto!= o.proto))
+	{
+	  if(verbose)
+	    printf("skiprecord\n");
+	  continue;
+	}
+      when = o.time;
+      ts = localtime(&when);
+      strftime(datestr, 63, "%Y-%m-%d %H:%M:%S", ts);
+      printf ("%s\t"
+	      "%hhu.%hhu.%hhu.%hhu\t"
+	      "%hhu.%hhu.%hhu.%hhu\t"
+	      "%hhu.%hhu.%hhu.%hhu\t"
+	      "%5hu\t%5hu\t%5hu\t%03hu\t%hhu\n",
+	      datestr, 
+	      o.srcaddr.o[3],o.srcaddr.o[2],o.srcaddr.o[1],o.srcaddr.o[0],
+	      o.nataddr.o[3],o.nataddr.o[2],o.nataddr.o[1],o.nataddr.o[0],
+	      o.dstaddr.o[3],o.dstaddr.o[2],o.dstaddr.o[1],o.dstaddr.o[0],
+	      o.srcport, o.natport, o.dstport, o.proto,o.type
+	      );   
+    }
+    archive_read_data_skip(a);  // Note 2
+  }
+  
+  r = archive_read_free(a);  // Note 3
+  if (r != ARCHIVE_OK){
+    printf("error %d :%s\n",archive_errno(a),archive_error_string(a));
+    exit(1);
+  }
 }
 int main(int argc,char ** argv){
   int c;
