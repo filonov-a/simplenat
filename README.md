@@ -58,7 +58,7 @@ usage nat-show [options] filenames
         -v      Dump each packet to stdout.
 ```
 Example:
-nat-show -s 10.100.77.199 -D 80 ../nat.file
+nat-show -s 10.100.77.199  -s 10.100.77.193  -s 10.100.77.191 -D 80 ../nat.file
 
 ##show.pl
 
