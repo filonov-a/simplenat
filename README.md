@@ -45,6 +45,8 @@ Example:
 
 Parser nat files.
 Can filter output by any field combination.
+Transparent work with compressed files supported through libarchive
+
 ```
 usage nat-show [options] filenames 
         -h      this text you see right here
