@@ -56,6 +56,8 @@ static int saCount,daCount,naCount,spCount,dpCount,npCount;
 
 int findIp(int count,ipv4 *ip,ipv4 v){
   int i;
+  if(count == 0) 
+    return 1;
   for(i=0; i<count;i++){
     if(v.w == ip[i].w) {
       if(verbose)
@@ -70,6 +72,8 @@ int findIp(int count,ipv4 *ip,ipv4 v){
 
 int findPort(int count,uint16_t *port,uint16_t v){
   int i;
+  if(count == 0) 
+    return 1;
   for(i=0; i<count;i++){
     if(v == port[i]) return 1;
   }
@@ -125,14 +129,14 @@ void parse_file(const char* fname){
               }
        */
       found = 0;
-      if(findIp(saCount, sa, o.srcaddr)  ||
-          findIp(daCount, da ,o.dstaddr) ||
-          findIp(naCount, na ,o.nataddr) ||
-          findPort(spCount, sp, o.srcport) ||
-          findPort(dpCount, dp, o.dstport) ||
-          findPort(npCount, np, o.natport) ||
-          (evtf && evt == o.type)   ||
-          (protof && proto == o.proto))
+      if(findIp(saCount, sa, o.srcaddr)  &&
+          findIp(daCount, da ,o.dstaddr)  &&
+          findIp(naCount, na ,o.nataddr)  &&
+          findPort(spCount, sp, o.srcport)  &&
+          findPort(dpCount, dp, o.dstport)  &&
+          findPort(npCount, np, o.natport)  &&
+          ( ! evtf || evt == o.type)    &&
+          ( ! protof || proto == o.proto))
       {
         found = 1;
       }
@@ -165,7 +169,7 @@ void parse_file(const char* fname){
   r = archive_read_free(a);  // Note 3
   if (r != ARCHIVE_OK){
     printf("error %d :%s\n",archive_errno(a),archive_error_string(a));
-    exit(1);
+    //exit(1);
   }
 }
 int main(int argc,char ** argv){
