@@ -14,8 +14,13 @@ typedef union  {
   uint8_t  o[4];
 }ipv4;
 
+typedef struct {
+  uint32_t ip;
+  uint32_t mask;
+} ipnet;
+
 #define MAX_FIELD 32
-#define PUSH_IP(a)   if( (a##Count) < MAX_FIELD){  string2ip(&(a[(a##Count)++]), optarg);}
+#define PUSH_IP(a)   if( (a##Count) < MAX_FIELD){ string2ip(&(a[(a##Count)++]), optarg);}
 #define PUSH_PORT(a)   if( (a##Count) < MAX_FIELD){ a[(a##Count)++]=atoi(optarg);}
 
 typedef struct {
@@ -34,9 +39,9 @@ FILE *F;
 static void usage(char *name) {
   printf("usage %s [options] filenames \n"
       "\t-h\tthis text you see right here\n"
-      "\t-s\tsource IP\n"
-      "\t-d\tdestination IP\n"
-      "\t-n\ttranslated IP\n"
+      "\t-s\tsource IP[/mask]\n"
+      "\t-d\tdestination IP[/mask]\n"
+      "\t-n\ttranslated IP[/mask]\n"
       "\t-S\tsource IP port\n"
       "\t-D\tdestination IP port\n"
       "\t-N\ttranslated IP port\n"
@@ -47,22 +52,22 @@ static void usage(char *name) {
 } /* usage */
 static int verbose = 0;
 char outbuff[sizeof(natdata)*1000];
-ipv4 sa[MAX_FIELD],da[MAX_FIELD],na[MAX_FIELD];
+ipnet sa[MAX_FIELD],da[MAX_FIELD],na[MAX_FIELD];
 uint16_t sp[MAX_FIELD],dp[MAX_FIELD],np[MAX_FIELD];
 uint8_t proto,evt;
 
 static int protof,evtf;
 static int saCount,daCount,naCount,spCount,dpCount,npCount;
 
-int findIp(int count,ipv4 *ip,ipv4 v){
+int findIp(int count,ipnet *ip,ipv4 v){
   int i;
   if(count == 0) 
     return 1;
   for(i=0; i<count;i++){
-    if(v.w == ip[i].w) {
+    if( (v.w & ip[i].mask) == ip[i].ip) {
       if(verbose)
         printf("IP Filter[%d] matched : %hhu.%hhu.%hhu.%hhu\n",i,
-            ip[i].o[3],ip[i].o[2],ip[i].o[1],ip[i].o[0]);
+            v.o[3],v.o[2],v.o[1],v.o[0]);
 
       return 1;
     }
@@ -79,18 +84,45 @@ int findPort(int count,uint16_t *port,uint16_t v){
   }
   return 0;
 }
-void string2ip(ipv4 *ip,const char *s){
+void string2ip(ipnet *ipn,const char *s){
   int n;
+  ipv4 ip;
+  unsigned mask;
+  uint32_t netmask=0xFFFFFFFF;
+  if(verbose) {
+      printf("Search for ip in :%s ...",s);
+  }
+  n = sscanf(s,"%hhu.%hhu.%hhu.%hhu/%u",
+	     &(ip.o[3]),
+	     &(ip.o[2]),
+	     &(ip.o[1]),
+	     &(ip.o[0]),
+	     &mask
+      );
+  if(verbose) {
+      printf(" %d\n",n);
+  }
+  if(n == 5){
+    if(verbose) {
+      printf("Add net %xu/%u",ip.w,mask);
+    }
+    ipn->ip = ip.w;
+    ipn->mask = 0xFFFFFFFF << (32 - mask);
+    ipn->ip = ip.w & ipn->mask;
+    return;
+  }
   n = sscanf(s,"%hhu.%hhu.%hhu.%hhu",
-      &(ip->o[3]),
-      &(ip->o[2]),
-      &(ip->o[1]),
-      &(ip->o[0])
+	     &(ip.o[3]),
+	     &(ip.o[2]),
+	     &(ip.o[1]),
+	     &(ip.o[0])
       );
   if(n != 4){
     fprintf(stderr,"Bad ip format: %s\n",s);
     exit(EXIT_FAILURE);
   }
+  ipn->ip = ip.w;
+  ipn->mask = 0xFFFFFFFF;
 }
 void parse_file(const char* fname){
   natdata o;
@@ -213,8 +245,8 @@ int main(int argc,char ** argv){
   }
   if(verbose){
     for(int i=0;i<saCount;i++){
-      printf("SA Filter[%d] : %hhu.%hhu.%hhu.%hhu\n",i,
-          sa[i].o[3],sa[i].o[2],sa[i].o[1],sa[i].o[0]);
+      printf("SA Filter[%d] : %xu/%xu\n",i,
+	     sa[i].ip,sa[i].mask);
     }
   }
   if (optind >= argc) {
