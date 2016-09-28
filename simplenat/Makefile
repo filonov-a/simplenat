@@ -14,7 +14,7 @@ NFLDFLAGS=-L$(NFDUMPBIN) -L/usr/local/lib -lz
 NFDUMPOBJS=$(NFDUMPBIN)/nffile.o $(NFDUMPBIN)/flist.o $(NFDUMPBIN)/util.o \
 	$(NFDUMPBIN)/minilzo.o 	$(NFDUMPBIN)/nfx.o $(NFDUMPBIN)/exporter.o
 
-TARGETS=nf2nat nat-show nfstat
+TARGETS=nf2nat nat-show nfstat nf2csv
 all: $(TARGETS)
 
 install:
@@ -22,6 +22,9 @@ install:
 
 nf2nat: nf2nat.c
 	$(CC) $(NFCFLAGS) -o nf2nat  nf2nat.c  $(NFDUMPOBJS)
+
+nf2csv: nf2csv.c
+	$(CC) $(NFCFLAGS) -o nf2csv  nf2csv.c  $(NFDUMPOBJS)
 
 nfstat: nfstat.c
 	$(CC) $(NFCFLAGS) -o nfstat  nfstat.c  $(NFDUMPOBJS)
