@@ -126,7 +126,7 @@ void string2ip(ipnet *ipn,const char *s){
 }
 void parse_file(const char* fname){
   natdata o;
-  size_t size;
+  off_t size;
   char datestr[64];
   struct tm 	*ts;
   time_t when;
@@ -152,7 +152,8 @@ void parse_file(const char* fname){
       printf("Read next entry \"%s\"\n",archive_entry_pathname(entry));
     }
     while((size = archive_read_data(a, &o, sizeof(o))) > 0){
-      //printf("Readed %lu bytes\n",size);
+      if(verbose)
+          printf("Readed %ld bytes\n",size);
       /*      if(verbose){
               printf (" %08x %08x %08x %08x %04hx %04hx %04hx %hhx %hhx\n",
               o.time, o.srcaddr.w, o.nataddr.w, o.dstaddr.w,
