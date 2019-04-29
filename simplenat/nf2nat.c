@@ -58,7 +58,7 @@
  * gcc -o nfreader nfreader.o nffile.o flist.o util.o  
  *
  */
- 
+
 #include "config.h"
 
 #include <stdio.h>
@@ -114,295 +114,319 @@ static void process_data(const char*);
 #include "nffile_inline.c"
 
 typedef struct {
-  uint32_t time;
-  uint32_t srcaddr;
-  uint32_t nataddr;
-  uint32_t dstaddr;
-  uint16_t srcport;
-  uint16_t natport;
-  uint16_t dstport;
-  uint8_t proto;
-  uint8_t type;
+    uint32_t time;
+    uint32_t srcaddr;
+    uint32_t nataddr;
+    uint32_t dstaddr;
+    uint16_t srcport;
+    uint16_t natport;
+    uint16_t dstport;
+    uint8_t proto;
+    uint8_t type;
 } outdata;
 
 char outbuff[sizeof(outdata)*1000];
 int verbose=0;
+int tabs=0;
+int show_lasttime = 0;
+outdata o;
 
 static void usage(char *name) {
-  printf("usage %s [options] \n"
-	 "-h\t\tthis text you see right here\n"
-	 "-r\t\tread input from file\n"
-	 "-M <expr>\tRead input from multiple directories.\n"
-	 "-R <expr>\tRead input from sequence of files.\n"
-	 "-o <file>\tWrite binary dump to file.\n"
-	 "-v \tDump each packet to stdout.\n"
-	 , name);
+    printf("usage %s [options] \n"
+            "-h\t\tthis text you see right here\n"
+            "-r\t\tread input from file\n"
+            "-M <expr>\tRead input from multiple directories.\n"
+            "-R <expr>\tRead input from sequence of files.\n"
+            "-o <file>\tWrite binary dump to file.\n"
+            "-v \tDump each packet to stdout.\n"
+            "-l \tShow time of last record\n"
+            "-t \tShow tab-separated data to stdout\n"
+            , name);
 } /* usage */
 
 static void print_record(void *record, char *s ) {
-  char 		as[40], ds[40], ns[40], datestr1[64], datestr2[64];
-  time_t		when;
-  struct tm 	*ts;
-  master_record_t *r = (master_record_t *)record;
+    char 		as[40], ds[40], ns[40], datestr1[64], datestr2[64];
+    time_t		when;
+    struct tm 	*ts;
+    master_record_t *r = (master_record_t *)record;
 
-  r->v4.srcaddr = htonl(r->v4.srcaddr);
-  r->v4.dstaddr = htonl(r->v4.dstaddr);
-  r->xlate_src_ip.v4 = htonl(r->xlate_src_ip.v4);
-  inet_ntop(AF_INET, &r->v4.srcaddr, as, sizeof(as));
-  inet_ntop(AF_INET, &r->v4.dstaddr, ds, sizeof(ds));
-  inet_ntop(AF_INET, &r->xlate_src_ip.v4, ns, sizeof(ns));
+    r->v4.srcaddr = htonl(r->v4.srcaddr);
+    r->v4.dstaddr = htonl(r->v4.dstaddr);
+    r->xlate_src_ip.v4 = htonl(r->xlate_src_ip.v4);
+    inet_ntop(AF_INET, &r->v4.srcaddr, as, sizeof(as));
+    inet_ntop(AF_INET, &r->v4.dstaddr, ds, sizeof(ds));
+    inet_ntop(AF_INET, &r->xlate_src_ip.v4, ns, sizeof(ns));
 
-  as[40-1] = 0;
-  ds[40-1] = 0;
-  ns[40-1] = 0;
+    as[40-1] = 0;
+    ds[40-1] = 0;
+    ns[40-1] = 0;
 
-  when = r->first;
-  ts = localtime(&when);
-  strftime(datestr1, 63, "%Y-%m-%d %H:%M:%S", ts);
+    when = r->first;
+    ts = localtime(&when);
+    strftime(datestr1, 63, "%Y-%m-%d %H:%M:%S", ts);
 
-  when = r->last;
-  ts = localtime(&when);
-  strftime(datestr2, 63, "%Y-%m-%d %H:%M:%S", ts);
+    when = r->last;
+    ts = localtime(&when);
+    strftime(datestr2, 63, "%Y-%m-%d %H:%M:%S", ts);
 
-  snprintf(s, 1023, "\n"
-	   "Flow Record: evt = %d xevt%d \n"
-	   "  srcaddr     = %16s\n"
-	   "  dstaddr     = %16s\n"
-	   "  nataddr     = %16s\n"
-	   "  first       =       %10u [%s]\n"
-	   "  last        =       %10u [%s]\n"
-	   "  proto       =              %3u\n"
-	   "  srcport     =            %5u\n"
-	   "  dstport     =            %5u\n"
-	   "  xsrcport    =            %5u\n"
-	   , 
-	   r->event,r->fw_xevent,as, ds, ns,r->first, datestr1, r->last, datestr2,
-	   r->prot, r->srcport, r->dstport,r->xlate_src_port);
-  s[1024-1] = 0;
+    snprintf(s, 1023, "\n"
+            "Flow Record: evt = %d xevt%d \n"
+            "  srcaddr     = %16s\n"
+            "  dstaddr     = %16s\n"
+            "  nataddr     = %16s\n"
+            "  first       =       %10u [%s]\n"
+            "  last        =       %10u [%s]\n"
+            "  proto       =              %3u\n"
+            "  srcport     =            %5u\n"
+            "  dstport     =            %5u\n"
+            "  xsrcport    =            %5u\n"
+            , 
+            r->event,r->fw_xevent,as, ds, ns,r->first, datestr1, r->last, datestr2,
+            r->prot, r->srcport, r->dstport,r->xlate_src_port);
+    s[1024-1] = 0;
 
 } // End of print_record
 
 static void write_data(FILE *F,void *record) {
-  outdata o;
-  master_record_t *r = (master_record_t *)record;
-  o.time  = r->first;
-  o.srcaddr = r->v4.srcaddr;
-  o.dstaddr = r->v4.dstaddr;
-  o.nataddr = r->xlate_src_ip.v4;
-  o.srcport = r->srcport;
-  o.dstport = r->dstport;
-  o.natport = r->xlate_src_port;
-  o.proto   = r->prot;
-  o.type    = r->event;
+    master_record_t *r = (master_record_t *)record;
+    o.time  = r->first;
+    o.srcaddr = r->v4.srcaddr;
+    o.dstaddr = r->v4.dstaddr;
+    o.nataddr = r->xlate_src_ip.v4;
+    o.srcport = r->srcport;
+    o.dstport = r->dstport;
+    o.natport = r->xlate_src_port;
+    o.proto   = r->prot;
+    o.type    = r->event;
 
-  fwrite(&o,sizeof(o),1,F);
-  if(verbose){
-      printf (" %08x %08x %08x %08x %04hx %04hx %04hx %02hhx %02hhx\n",
-	      o.time,
-	      o.srcaddr,
-	      o.nataddr,
-	      o.dstaddr,
-	      o.srcport,
-	      o.natport,
-	      o.dstport,
-	      o.proto,
-	      o.type
-	      );
-  }
+    fwrite(&o,sizeof(o),1,F);
+    if(tabs){
+        printf ("%u\t%u\t%u\t%u\t%hu\t%hu\t%hu\t%hhu\t%hhu\n",
+                o.time,
+                o.srcaddr,
+                o.nataddr,
+                o.dstaddr,
+                o.srcport,
+                o.natport,
+                o.dstport,
+                o.proto,
+                o.type
+               );
+    }
 } // End of print_record
 
 
 static void process_data(const char* outfile) {
-  master_record_t	master_record;
-  common_record_t *flow_record;
-  nffile_t		*nffile;
-  int 		i, done, ret;
-  FILE *F=NULL;
+    int corrupted_file=0;
+    master_record_t	master_record;
+    common_record_t *flow_record;
+    nffile_t		*nffile;
+    int 		i, done, ret;
+    FILE *F=NULL;
 
-  // Get the first file handle
-  if(outfile !=NULL){
-    F = fopen(outfile,"w");
-    if(F == NULL){
-      LogError("Cannot open output file %s in %s line %d: %s\n",outfile, __FILE__, __LINE__, strerror(errno) );
-      exit(EXIT_FAILURE);
-    } 
-    setbuffer(F,outbuff,sizeof(outbuff));
-  }
-  // Get the first file handle
-  nffile = GetNextFile(NULL, 0, 0);
-  if ( !nffile ) {
-    LogError("GetNextFile() error in %s line %d: %s\n", __FILE__, __LINE__, strerror(errno) );
-      exit(EXIT_FAILURE);
-  }
-  if ( nffile == EMPTY_LIST ) {
-    LogError("Empty file list. No files to process\n");
-      exit(EXIT_FAILURE);
-  }
-  
-  done = 0;
-  while ( !done ) {
-    // get next data block from file
-    ret = ReadBlock(nffile);
-
-    switch (ret) {
-    case NF_CORRUPT:
-    case NF_ERROR:
-      if ( ret == NF_CORRUPT ) 
-	fprintf(stderr, "Skip corrupt data file '%s'\n",GetCurrentFilename());
-      else 
-	fprintf(stderr, "Read error in file '%s': %s\n",GetCurrentFilename(), strerror(errno) );
-      // fall through - get next file in chain
-    case NF_EOF: {
-      nffile_t *next = GetNextFile(nffile, 0, 0);
-      if ( next == EMPTY_LIST ) {
-	done = 1;
-      }
-      if ( next == NULL ) {
-	done = 1;
-	LogError("Unexpected end of file list\n");
-      }
-      // else continue with next file
-      continue;
-
-    } break; // not really needed
+    // Get the first file handle
+    if(outfile !=NULL){
+        F = fopen(outfile,"w");
+        if(F == NULL){
+            LogError("Cannot open output file %s in %s line %d: %s\n",outfile, __FILE__, __LINE__, strerror(errno) );
+            exit(EXIT_FAILURE);
+        } 
+        setbuffer(F,outbuff,sizeof(outbuff));
+    }
+    // Get the first file handle
+    nffile = GetNextFile(NULL, 0, 0);
+    if ( !nffile ) {
+        LogError("GetNextFile() error in %s line %d: %s\n", __FILE__, __LINE__, strerror(errno) );
+        exit(EXIT_FAILURE);
+    }
+    if ( nffile == EMPTY_LIST ) {
+        LogError("Empty file list. No files to process\n");
+        exit(EXIT_FAILURE);
     }
 
+    done = 0;
+    while ( !done ) {
+        // get next data block from file
+        ret = ReadBlock(nffile);
 
-    if ( nffile->block_header->id == Large_BLOCK_Type ) {
-      // skip
-      continue;
+        switch (ret) {
+            case NF_CORRUPT:
+            case NF_ERROR:
+                if ( ret == NF_CORRUPT ) 
+                    fprintf(stderr, "Skip corrupt data file '%s'\n",GetCurrentFilename());
+                else 
+                    fprintf(stderr, "Read error in file '%s': %s\n",GetCurrentFilename(), strerror(errno) );
+                // fall through - get next file in chain
+                corrupted_file =1 ;
+            case NF_EOF: {
+                             nffile_t *next = GetNextFile(nffile, 0, 0);
+                             if ( next == EMPTY_LIST ) {
+                                 done = 1;
+                             }
+                             if ( next == NULL ) {
+                                 done = 1;
+                                 LogError("Unexpected end of file list\n");
+                             }
+                             // else continue with next file
+                             continue;
+
+                         } break; // not really needed
+        }
+
+
+        if ( nffile->block_header->id == Large_BLOCK_Type ) {
+            // skip
+            continue;
+        }
+
+        if ( nffile->block_header->id != DATA_BLOCK_TYPE_2 ) {
+            fprintf(stderr, "Can't process block type %u. Skip block.\n", nffile->block_header->id);
+            continue;
+        }
+
+        flow_record = nffile->buff_ptr;
+        for ( i=0; i < nffile->block_header->NumRecords; i++ ) {
+            char        string[1024];
+
+            switch ( flow_record->type ) {
+                case CommonRecordType: {
+                                           uint32_t map_id = flow_record->ext_map;
+                                           generic_exporter_t *exp_info = exporter_list[flow_record->exporter_sysid];
+                                           if ( extension_map_list->slot[map_id] == NULL ) {
+                                               snprintf(string, 1024, "Corrupt data file! No such extension map id: %u. Skip record", \
+                                                       flow_record->ext_map );
+                                               string[1023] = '\0';
+                                               corrupted_file =1 ;
+                                           } else {
+                                               ExpandRecord_v2( flow_record, extension_map_list->slot[flow_record->ext_map], 
+                                                       exp_info ? &(exp_info->info) : NULL, &master_record);
+
+                                               // update number of flows matching a given map
+                                               extension_map_list->slot[map_id]->ref_count++;
+
+                                               /* 
+                                                * insert hier your calls to your processing routine 
+                                                * master_record now contains the next flow record as specified in nffile.c
+                                                * for example you can print each record:
+                                                *
+                                                */
+                                               if(verbose){
+                                                   print_record(&master_record, string);
+                                                   fprintf(stderr,"%s\n", string);
+                                               }
+                                               if(F) { 
+                                                   write_data(F,&master_record);
+                                               }
+                                           }
+
+                                       } break;
+                case ExtensionMapType: {
+                                           extension_map_t *map = (extension_map_t *)flow_record;
+
+                                           if ( Insert_Extension_Map(extension_map_list, map) ) {
+                                               // flush new map
+                                           } // else map already known and flushed
+
+                                       } break;
+                case ExporterInfoRecordType:
+                case ExporterStatRecordType:
+                case SamplerInfoRecordype:
+                                       // Silently skip exporter records
+                                       break;
+                default: {
+                             //fprintf(stderr, "Skip unknown record type %i\n", flow_record->type);
+                         }
+            }
+
+            // Advance pointer by number of bytes for netflow record
+            flow_record = (common_record_t *)((pointer_addr_t)flow_record + flow_record->size);	
+
+        } // for all records
+
+    } // while
+
+    CloseFile(nffile);
+    DisposeFile(nffile);
+
+    PackExtensionMapList(extension_map_list);
+    if(F){
+        fclose(F);
     }
-
-    if ( nffile->block_header->id != DATA_BLOCK_TYPE_2 ) {
-      fprintf(stderr, "Can't process block type %u. Skip block.\n", nffile->block_header->id);
-      continue;
+    if(show_lasttime){
+        char datestr[256];
+        time_t when = o.time;
+        struct tm* ts = localtime(&when);
+        strftime(datestr, sizeof(datestr)-1, "Last found time :%Y-%m-%d %H:%M:%S\n", ts);
+        fputs(datestr,stderr);
     }
-
-    flow_record = nffile->buff_ptr;
-    for ( i=0; i < nffile->block_header->NumRecords; i++ ) {
-      char        string[1024];
-
-      switch ( flow_record->type ) {
-      case CommonRecordType: {
-	uint32_t map_id = flow_record->ext_map;
-	generic_exporter_t *exp_info = exporter_list[flow_record->exporter_sysid];
-	if ( extension_map_list->slot[map_id] == NULL ) {
-	  snprintf(string, 1024, "Corrupt data file! No such extension map id: %u. Skip record", flow_record->ext_map );
-	  string[1023] = '\0';
-	} else {
-	  ExpandRecord_v2( flow_record, extension_map_list->slot[flow_record->ext_map], 
-			   exp_info ? &(exp_info->info) : NULL, &master_record);
-
-	  // update number of flows matching a given map
-	  extension_map_list->slot[map_id]->ref_count++;
-			
-	  /* 
-	   * insert hier your calls to your processing routine 
-	   * master_record now contains the next flow record as specified in nffile.c
-	   * for example you can print each record:
-	   *
-	   */
-	  if(verbose){
-	    print_record(&master_record, string);
-	    printf("%s\n", string);
-	  }
-	  if(F) { 
-	    write_data(F,&master_record);
-	  }
-	}
-	
-      } break;
-      case ExtensionMapType: {
-	extension_map_t *map = (extension_map_t *)flow_record;
-
-	if ( Insert_Extension_Map(extension_map_list, map) ) {
-	  // flush new map
-	} // else map already known and flushed
-
-      } break;
-      case ExporterInfoRecordType:
-      case ExporterStatRecordType:
-      case SamplerInfoRecordype:
-	// Silently skip exporter records
-	break;
-      default: {
-	fprintf(stderr, "Skip unknown record type %i\n", flow_record->type);
-      }
-      }
-
-      // Advance pointer by number of bytes for netflow record
-      flow_record = (common_record_t *)((pointer_addr_t)flow_record + flow_record->size);	
-
-    } // for all records
-
-  } // while
-
-  CloseFile(nffile);
-  DisposeFile(nffile);
-
-  PackExtensionMapList(extension_map_list);
-  if(F){
-    fclose(F);
-  }
+    if(corrupted_file){
+        exit(EXIT_FAILURE);
+    }
 } // End of process_data
 
 
 int main( int argc, char **argv ) {
-  char 		*rfile, *Rfile, *Mdirs,*outfile=NULL;
-  int			c;
+    char 		*rfile, *Rfile, *Mdirs,*outfile=NULL;
+    int			c;
 
-  rfile = Rfile = Mdirs = NULL;
-  while ((c = getopt(argc, argv, "vL:r:M:R:o:")) != EOF) {
-    switch (c) {
-    case 'h':
-      usage(argv[0]);
-      exit(0);
-      break;
-    case 'v':
-      verbose = 1;
-      break;
-    case 'L':
-      if ( !InitLog("argv[0]", optarg) )
-	exit(255);
-      break;
-    case 'r':
-      rfile = optarg;
-      if ( strcmp(rfile, "-") == 0 )
-	rfile = NULL;
-      break;
-    case 'o':
-      outfile = optarg;
-      break;
-    case 'M':
-      Mdirs = optarg;
-      break;
-    case 'R':
-      Rfile = optarg;
-      break;
-    default:
-      usage(argv[0]);
-      exit(0);
+    rfile = Rfile = Mdirs = NULL;
+    while ((c = getopt(argc, argv, "tvlL:r:M:R:o:")) != EOF) {
+        switch (c) {
+            case 'h':
+                usage(argv[0]);
+                exit(0);
+                break;
+            case 'v':
+                verbose = 1;
+                break;
+            case 't':
+                tabs = 1;
+                break;
+            case 'l':
+                show_lasttime = 1;
+                break;
+            case 'L':
+                if ( !InitLog("argv[0]", optarg) )
+                    exit(255);
+                break;
+            case 'r':
+                rfile = optarg;
+                if ( strcmp(rfile, "-") == 0 )
+                    rfile = NULL;
+                break;
+            case 'o':
+                outfile = optarg;
+                break;
+            case 'M':
+                Mdirs = optarg;
+                break;
+            case 'R':
+                Rfile = optarg;
+                break;
+            default:
+                usage(argv[0]);
+                exit(0);
+        }
     }
-  }
 
-  if ( rfile && Rfile ) {
-    fprintf(stderr, "-r and -R are mutually exclusive. Please specify either -r or -R\n");
-    exit(255);
-  }
-  if ( Mdirs && !(rfile || Rfile) ) {
-    fprintf(stderr, "-M needs either -r or -R to specify the file or file list. Add '-R .' for all files in the directories.\n");
-    exit(255);
-  }
-  
-  extension_map_list = InitExtensionMaps(NEEDS_EXTENSION_LIST);
-  if ( !InitExporterList() ) {
-    exit(255);
-  }
+    if ( rfile && Rfile ) {
+        fprintf(stderr, "-r and -R are mutually exclusive. Please specify either -r or -R\n");
+        exit(255);
+    }
+    if ( Mdirs && !(rfile || Rfile) ) {
+        fprintf(stderr, "-M needs either -r or -R to specify the file or file list. Add '-R .' for all files in the directories.\n");
+        exit(255);
+    }
 
-  SetupInputFileSequence(Mdirs, rfile, Rfile);
-  process_data(outfile);
-  
-  FreeExtensionMaps(extension_map_list);
-  
-  return 0;
+    extension_map_list = InitExtensionMaps(NEEDS_EXTENSION_LIST);
+    if ( !InitExporterList() ) {
+        exit(255);
+    }
+
+    SetupInputFileSequence(Mdirs, rfile, Rfile);
+    process_data(outfile);
+
+    FreeExtensionMaps(extension_map_list);
+
+    return 0;
 }
